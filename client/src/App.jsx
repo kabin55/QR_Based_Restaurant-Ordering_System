@@ -1,19 +1,16 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 
+import MenuPage from './pages/menuPage.jsx'
+import HomePage from './pages/homePage.jsx'
 function App() {
   return (
-    <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm text-center">
-      <h2 className="text-2xl font-bold text-gray-800">Tailwind Card</h2>
-      <p className="text-gray-600 mt-3">
-        This is a simple card layout built with Tailwind CSS.
-      </p>
-      <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4">
-        Learn More
-      </button>
-    </div>
+    <Router>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/menu" element={<MenuPage />} />
+      </Routes>
+    </Router>
   )
 }
 
