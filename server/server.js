@@ -1,8 +1,10 @@
 import http from 'http'
 import app from './app.js'
 import dotenv from 'dotenv'
+import { connectDB } from './config/connectDB.js'
 
-dotenv.config()
+dotenv.config({ path: '../.env' })
+connectDB()
 
 const port = process.env.BACKEND_PORT || 3000
 const server = http.createServer(app)
