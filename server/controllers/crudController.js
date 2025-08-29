@@ -19,6 +19,7 @@ export const addItem = async (req, res) => {
 }
 export const updateItem = async (req, res) => {
   try {
+    console.log('Updating item with ID:', req.params.id, req.body)
     const updatedItem = await item.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
     })
@@ -34,7 +35,9 @@ export const updateItem = async (req, res) => {
 }
 export const deleteItem = async (req, res) => {
   try {
+    console.log('Deleting item with ID:', req.params.id)
     const deletedItem = await item.findByIdAndDelete(req.params.id)
+    console.log('Deleted item:', deletedItem)
     if (!deletedItem) {
       return res.status(404).json({ message: 'Item not found' })
     }

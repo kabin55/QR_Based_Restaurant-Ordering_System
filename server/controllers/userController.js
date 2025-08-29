@@ -1,5 +1,4 @@
 import { item } from '../models/itemModel.js'
-import { Detail } from '../models/detailModel.js'
 
 export const getItems = async (req, res) => {
   try {
@@ -10,29 +9,5 @@ export const getItems = async (req, res) => {
     res
       .status(500)
       .json({ message: 'Error fetching items', error: error.message })
-  }
-}
-export const getItemById = async (req, res) => {
-  try {
-    const itemFound = await item.findById(req.params.id)
-    if (!itemFound) {
-      return res.status(404).json({ message: 'Item not found' })
-    }
-    res.status(200).json(itemFound)
-  } catch (error) {
-    res
-      .status(500)
-      .json({ message: 'Error fetching item', error: error.message })
-  }
-}
-export const getDetails = async (req, res) => {
-  try {
-    const details = await Detail.find()
-    res.status(200).json(details)
-    console.log('Details fetched successfully:', details)
-  } catch (error) {
-    res
-      .status(500)
-      .json({ message: 'Error fetching details', error: error.message })
   }
 }

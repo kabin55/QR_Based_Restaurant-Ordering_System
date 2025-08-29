@@ -1,6 +1,11 @@
 import mongoose from 'mongoose'
 
 const detailSchema = new mongoose.Schema({
+  restaurantId: {
+    type: String,
+    required: true,
+    unique: true,
+  },
   restaurantName: {
     type: String,
     required: true,
@@ -15,16 +20,18 @@ const detailSchema = new mongoose.Schema({
   image: {
     type: String,
   },
-  // loginCredentials: {
-  //   username: {
-  //     type: String,
-  //     required: true,
-  //   },
-  //   password: {
-  //     type: String,
-  //     required: true,
-  //   },
-  // },
+  loginCredentials: {
+    username: {
+      default: 'admin',
+      type: String,
+      required: true,
+    },
+    password: {
+      default: 'password',
+      type: String,
+      required: true,
+    },
+  },
 })
 
 export const Detail = mongoose.model('Detail', detailSchema)
