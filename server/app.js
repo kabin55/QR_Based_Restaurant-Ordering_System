@@ -1,31 +1,25 @@
 import express from 'express'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
+import dotenv from 'dotenv'
 
 import { router as userRouter } from './routes/userRoute.js'
 import { router as adminRouter } from './routes/adminRoute.js'
 import { protectedRoute } from './middleware/token.js'
 
 const app = express()
+dotenv.config({ path: '../.env' })
 
 app.get('/', (req, res) => {
   res.send('Server is running!')
-  console.log(process.env.FRONTEND_URL)
 })
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
-// app.use(
-//   cors({
-//     origin: process.env.FRONTEND_URL,
-//     credentials: true,
-//   })
-// )
-
 app.use(
   cors({
-    origin: 'http://192.168.1.70:3000',
+    origin: process.env.FRONTEND_URL,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     credentials: true,
   })

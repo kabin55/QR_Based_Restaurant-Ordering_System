@@ -2,21 +2,30 @@ import mongoose from 'mongoose'
 
 const itemSchema = new mongoose.Schema(
   {
-    type: {
+    restaurantId: {
       type: String,
       required: true,
+      unique: true,
     },
-    item: {
-      type: String,
-      required: true,
-    },
-    price: {
-      type: Number,
-      required: true,
-    },
-    pic: {
-      type: String,
-    },
+    itemList: [
+      {
+        type: {
+          type: String,
+          required: true,
+        },
+        item: {
+          type: String,
+          required: true,
+        },
+        price: {
+          type: Number,
+          required: true,
+        },
+        pic: {
+          type: String,
+        },
+      },
+    ],
   },
   { timestamps: true }
 )

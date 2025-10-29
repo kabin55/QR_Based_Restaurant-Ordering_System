@@ -1,42 +1,99 @@
 import React, { useState } from 'react'
-import { User, Lock } from 'lucide-react'
+import { User, Lock, Eye, EyeOff } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
+// import { Eye, EyeOff } from 'lucide-react'
+
+import { Toast } from '../../components/Toast'
 
 export default function LoginForm() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
+  const [toast, setToast] = useState({ message: '', type: 'info' })
+  const [showPassword, setShowPassword] = useState(false)
 
   const navigate = useNavigate()
 
+  const restaurantData = JSON.parse(localStorage.getItem('restaurantDetails'))
+  const restaurantId = restaurantData?.restaurantId
+
+  useEffect(() => {
+    if (!restaurantId) {
+      setToast({ message: 'Restaurant details not found', type: 'error' })
+      // optional: redirect after showing toast
+      setTimeout(() => navigate('/'), 500)
+    }
+  }, [restaurantId, navigate])
+
+  if (!restaurantId) return null
+
   const handleSubmit = async (e) => {
     e.preventDefault()
-    console.log('Sending login:', { username, password, rememberMe })
+    // console.log('Sending login:', { username, password, rememberMe })
 
     try {
+      if (password.length < 6) {
+        setToast({
+          message: 'Password must be at least 6 characters.',
+          type: 'error',
+        })
+        return
+      }
+      // console.log('Sending login:', {
+      //   restaurantId,
+      //   username,
+      //   password,
+      //   rememberMe,
+      // })
       const response = await fetch(
         `${import.meta.env.VITE_BACKEND_URL}/login`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password, rememberMe }),
+          body: JSON.stringify({
+            restaurantId,
+            username,
+            password,
+            rememberMe,
+          }),
           credentials: 'include',
         }
       )
 
       if (!response.ok) {
-        console.error('Login failed:', response.statusText)
-        alert('Login failed. Please check your credentials.')
+        setToast({
+          message: 'Login failed. Please check your credentials.',
+          type: 'error',
+        })
+        // console.error('Login failed:', response.statusText)
+        setToast({
+          message: 'Login failed. Please check your credentials.',
+          type: 'error',
+        })
+        navigate('/login')
         return
       }
 
       const data = await response.json()
-      console.log('Login successful:', data)
-      alert('Login successful: ' + data.message)
-      navigate('/dashboard')
+      // console.log('Login successful:', data)
+      setToast({
+        message: 'Login successful: ' + data.message,
+        type: 'success',
+      })
+
+      if (restaurantId === '100') {
+        // console.log('Redirecting to setup page for new restaurant')
+        navigate('/new')
+      } else {
+        navigate('/dashboard')
+      }
     } catch (error) {
       console.error('Error:', error)
-      alert('Login failed. Please check your credentials.')
+      setToast({
+        message: 'Login failed. Please check your credentials.',
+        type: 'error',
+      })
       navigate('/login')
     }
   }
@@ -82,13 +139,21 @@ export default function LoginForm() {
               <input
                 id="password"
                 name="password"
-                type="password"
+                type={showPassword ? 'text' : 'password'} // 👈 toggle here
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="bg-transparent outline-none w-full text-gray-700 placeholder-gray-400"
                 required
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)} // 👈 toggle state
+                className="ml-2 text-gray-500 hover:text-gray-700 focus:outline-none"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}{' '}
+                {/* 👈 icon swap */}
+              </button>
             </div>
           </div>
 
@@ -104,9 +169,11 @@ export default function LoginForm() {
               <span className="ml-2 select-none">Remember me</span>
             </label>
             <button
-              type="submit"
+              type="button"
               className="hover:underline"
-              onClick={() => alert('Forgot password clicked')}
+              onClick={() =>
+                setToast({ message: 'Forgot password clicked', type: 'info' })
+              }
             >
               Forgot password?
             </button>
@@ -121,17 +188,25 @@ export default function LoginForm() {
           </button>
 
           {/* Register link */}
-          <div className="text-center mt-2 text-xs text-gray-500">
+          {/* <div className="text-center mt-2 text-xs text-gray-500">
             <button
               type="button"
               className="hover:underline"
-              onClick={() => alert('Register clicked')}
+              onClick={() =>
+                setToast({ message: 'Register clicked', type: 'info' })
+              }
             >
               Register
             </button>
-          </div>
+          </div> */}
         </form>
       </div>
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        duration={5000}
+        onClose={() => setToast({ message: '', type: 'info' })}
+      />
     </div>
   )
 }

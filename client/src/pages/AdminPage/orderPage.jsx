@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { Search, Printer } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { io } from 'socket.io-client'
+import { socket } from '../../utils/socket.js'
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([])
@@ -11,13 +11,84 @@ export default function AdminOrdersPage() {
   const [revenueFilter, setRevenueFilter] = useState('today')
   const navigate = useNavigate()
 
+  const [soundEnabled, setSoundEnabled] = useState(false)
+
+  const audioRef = useRef(null)
+  const previousOrdersRef = useRef([])
+
+  const restaurantId = JSON.parse(
+    localStorage.getItem('restaurantDetails')
+  )?.restaurantId
+
+  // Socket listener
+  // useEffect(() => {
+  //   const handleOrdersUpdated = (payload) => {
+  //     if (payload && Array.isArray(payload.orders)) {
+  //       setOrders(payload.orders)
+  //     } else if (Array.isArray(payload)) {
+  //       setOrders(payload)
+  //     } else {
+  //       console.error('Invalid socket payload:', payload)
+  //     }
+
+  //     if (soundEnabled && audioRef.current) {
+  //       audioRef.current.currentTime = 0 // restart sound
+  //       audioRef.current
+  //         .play()
+  //         .catch((err) => console.warn('Autoplay blocked:', err))
+  //     }
+  //   }
+
+  //   socket.on('ordersUpdated', handleOrdersUpdated)
+  //   return () => socket.off('ordersUpdated', handleOrdersUpdated)
+  // }, [soundEnabled, socket])
+
+  useEffect(() => {
+    const handleOrdersUpdated = (payload) => {
+      let newOrders = []
+
+      if (payload && Array.isArray(payload.orders)) {
+        newOrders = payload.orders
+      } else if (Array.isArray(payload)) {
+        newOrders = payload
+      } else {
+        console.error('Invalid socket payload:', payload)
+        return
+      }
+
+      // Detect newly added orders
+      if (
+        previousOrdersRef.current.length > 0 &&
+        newOrders.length > previousOrdersRef.current.length
+      ) {
+        const newestOrder = newOrders[0] // assuming newest first
+        printBill(newestOrder)
+
+        if (soundEnabled && audioRef.current) {
+          audioRef.current.currentTime = 0
+          audioRef.current
+            .play()
+            .catch((err) => console.warn('Autoplay blocked:', err))
+        }
+      }
+
+      // Update state only once
+      setOrders(newOrders)
+      previousOrdersRef.current = newOrders
+    }
+
+    socket.on('ordersUpdated', handleOrdersUpdated)
+    return () => socket.off('ordersUpdated', handleOrdersUpdated)
+  }, [soundEnabled])
+
+  // Fetch initial orders
   useEffect(() => {
     const fetchOrders = async () => {
       setIsLoading(true)
       setError(null)
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_BACKEND_URL}/admin/orders/all`,
+          `${import.meta.env.VITE_BACKEND_URL}/admin/orders/${restaurantId}`,
           {
             headers: {
               Accept: 'application/json',
@@ -33,25 +104,26 @@ export default function AdminOrdersPage() {
           )
         }
         const data = await res.json()
-        if (!data.orders || !Array.isArray(data.orders)) {
-          throw new Error('Invalid response format: Expected an orders array')
+        // console.log('Fetched orders for restaurant:', data)
+
+        if (Array.isArray(data.orders)) {
+          setOrders(data.orders)
+        } else if (Array.isArray(data)) {
+          setOrders(data)
+        } else {
+          throw new Error('Invalid response format: expected array of orders')
         }
-        setOrders(data.orders)
-      } catch (error) {
-        console.error('Error fetching orders:', error)
-        setError(
-          'Failed to load orders. Please check the server and try again.'
-        )
+      } catch (err) {
+        console.error('Error fetching orders:', err)
+        setError('Failed to load orders.')
       } finally {
         setIsLoading(false)
       }
     }
     fetchOrders()
-  }, [])
+  }, [restaurantId])
 
-  const handleFilterChange = (filter) => {
-    setRevenueFilter(filter)
-  }
+  const handleFilterChange = (filter) => setRevenueFilter(filter)
 
   const updateOrderStatus = async (orderId, newStatus) => {
     const previousOrders = orders
@@ -61,6 +133,7 @@ export default function AdminOrdersPage() {
           order._id === orderId ? { ...order, status: newStatus } : order
         )
       )
+
       const res = await fetch(
         `${import.meta.env.VITE_BACKEND_URL}/admin/orders/${orderId}`,
         {
@@ -73,12 +146,14 @@ export default function AdminOrdersPage() {
           credentials: 'include',
         }
       )
+
       if (!res.ok) {
         const text = await res.text()
         throw new Error(
           `Failed to update status: ${res.status} ${res.statusText}\nResponse: ${text}`
         )
       }
+
       const data = await res.json()
       setOrders((prev) =>
         prev.map((order) =>
@@ -87,74 +162,61 @@ export default function AdminOrdersPage() {
             : order
         )
       )
-    } catch (error) {
-      console.error('Error updating status:', error)
+    } catch (err) {
+      console.error('Error updating status:', err)
       setOrders(previousOrders)
-      setError('Failed to update order status. Please try again.')
+      setError('Failed to update order status.')
     }
   }
 
   const printBill = (order) => {
     const printWindow = window.open('', '_blank')
     printWindow.document.write(`
-      <html>
-        <head>
-          <title>Bill for Order ${order._id}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            h1 { text-align: center; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; }
-            .total { font-weight: bold; }
-            .footer { margin-top: 20px; text-align: center; }
-          </style>
-        </head>
-        <body>
-          <h1>Bill for Order ${order._id}</h1>
-          <p><strong>Table No:</strong> ${order.tableno ?? 'N/A'}</p>
-          <p><strong>Date:</strong> ${new Date(order.createdAt).toLocaleString(
-            'en-US',
-            {
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-            }
-          )}</p>
-          <table>
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Quantity</th>
-                <th>Price</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${order.items
-                .map(
-                  (item) => `
-                <tr>
-                  <td>${item.item}</td>
-                  <td>${item.quantity}</td>
-                  <td>Rs: ${item.price ? item.price.toFixed(2) : 'N/A'}</td>
-                </tr>`
-                )
-                .join('')}
-            </tbody>
-          </table>
-          <p class="total">Total: Rs: ${(order.subtotal || 0).toFixed(2)}</p>
-          <p class="footer">Thank you for your order!</p>
-        </body>
-      </html>
-    `)
+    <html>
+      <head>
+        <title>Bill for Order ${order._id}</title>
+        <style>
+          @media print {
+            @page { size: 57mm ; margin: 0; }
+            body { width: 57mm; font-family: Arial, sans-serif; padding: 2mm; }
+          }
+          h1 { text-align: center; font-size: 12px; margin: 0; }
+          table { width: 100%; border-collapse: collapse; font-size: 10px; }
+          th, td { padding: 2px; text-align: left; }
+          .total { font-weight: bold; }
+        </style>
+      </head>
+      <body>
+      <br>
+        <h1>Order ${order._id}</h1>
+        <p>Table: ${order.tableno ?? 'N/A'}</p>
+        <table>
+          <tbody>
+            ${order.items
+              .map(
+                (i) =>
+                  `<tr><td>${i.item}</td><td>×${i.quantity}</td><td>${
+                    i.price?.toFixed(2) ?? 'N/A'
+                  }</td></tr>`
+              )
+              .join('')}
+          </tbody>
+        </table>
+        <p class="total">Total: Rs ${order.subtotal?.toFixed(2) ?? 0}</p>
+      </body>
+    </html>
+  `)
     printWindow.document.close()
     printWindow.print()
   }
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  // const today = new Date()
+  // today.setHours(0, 0, 0, 0)
+  const today = useMemo(() => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    return d
+  }, [])
 
   const { pendingOrders, completedOrders, filteredOrders, totalRevenue } =
     useMemo(() => {
@@ -164,39 +226,34 @@ export default function AdminOrdersPage() {
       const filtered =
         revenueFilter === 'today'
           ? orders.filter((order) => {
-              const orderDate = new Date(order.createdAt).getTime()
-              return orderDate >= startOfDay && orderDate < endOfDay
+              const ts = new Date(order.createdAt || Date.now()).getTime()
+              return ts >= startOfDay && ts < endOfDay
             })
           : orders
 
-      const searchedOrders = filtered.filter(
+      const searched = filtered.filter(
         (order) =>
           order._id.toLowerCase().includes(search.toLowerCase()) ||
-          (order.tableno
-            ?.toString()
-            .toLowerCase()
-            .includes(search.toLowerCase()) ??
-            false) ||
-          order.items.some((item) =>
-            item.item.toLowerCase().includes(search.toLowerCase())
+          (order.tableno || '').toLowerCase().includes(search.toLowerCase()) ||
+          order.items.some((i) =>
+            i.item.toLowerCase().includes(search.toLowerCase())
           ) ||
           order.status.toLowerCase().includes(search.toLowerCase())
       )
 
-      const revenue = filtered.reduce(
-        (sum, order) => sum + (order.subtotal || 0),
-        0
+      // sort by createdAt descending so newest order is at top
+      const sorted = [...searched].sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
       )
 
+      const revenue = filtered.reduce((sum, o) => sum + (o.subtotal || 0), 0)
+
       const counts = orders.reduce(
-        (acc, order) => {
-          const orderDate = new Date(order.createdAt).getTime()
-          if (orderDate >= startOfDay && orderDate < endOfDay) {
-            if (order.status === 'pending') {
-              acc.pendingOrders += 1
-            } else if (order.status === 'completed') {
-              acc.completedOrders += 1
-            }
+        (acc, o) => {
+          const ts = new Date(o.createdAt || Date.now()).getTime()
+          if (ts >= startOfDay && ts < endOfDay) {
+            if (o.status === 'pending') acc.pendingOrders += 1
+            else if (o.status === 'completed') acc.completedOrders += 1
           }
           return acc
         },
@@ -206,15 +263,14 @@ export default function AdminOrdersPage() {
       return {
         pendingOrders: counts.pendingOrders,
         completedOrders: counts.completedOrders,
-        filteredOrders: searchedOrders,
+        filteredOrders: sorted,
         totalRevenue: revenue,
       }
     }, [orders, search, revenueFilter])
-
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
+        <audio ref={audioRef} src="/notification.mp3" preload="auto" />
         <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
@@ -262,7 +318,28 @@ export default function AdminOrdersPage() {
                 Rs: {totalRevenue.toFixed(2)}
               </p>
             </div>
-          </div>
+          </div>{' '}
+          <label className="flex items-center gap-3 cursor-pointer mb-6">
+            <span>Enable Notification</span>
+            <div
+              className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${
+                soundEnabled ? 'bg-blue-500' : 'bg-gray-300'
+              }`}
+              onClick={() => {
+                if (!soundEnabled) {
+                  // audioRef.current?.play().then(() => audioRef.current?.pause())
+                  audioRef.current?.play()
+                }
+                setSoundEnabled(!soundEnabled)
+              }}
+            >
+              <div
+                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
+                  soundEnabled ? 'translate-x-6' : ''
+                }`}
+              />
+            </div>
+          </label>
         </section>
         <div className="flex gap-2">
           <button

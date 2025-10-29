@@ -32,6 +32,12 @@ const detailSchema = new mongoose.Schema({
       required: true,
     },
   },
+  offer: {
+    type: String,
+    default: '',
+  },
+  itemsId: { type: mongoose.Schema.Types.ObjectId, ref: 'Items' },
+  orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Orders' },
 })
 
 export const Detail = mongoose.model('Detail', detailSchema)
