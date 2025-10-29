@@ -2,12 +2,12 @@ import jwt from 'jsonwebtoken'
 
 export const token = (res, payload) => {
   const secretKey = process.env.TOKEN_SECRET
-  console.log('Generating token with secret key:', secretKey)
+  // console.log('Generating token with secret key:', secretKey)
   if (!secretKey) throw new Error('TOKEN_SECRET not set')
 
   // Always wrap payload in an object so JWT gets a proper claim set
   const jwtToken = jwt.sign({ user: payload }, secretKey, { expiresIn: '1d' })
-  console.log('Generated JWT:', jwtToken)
+  // console.log('Generated JWT:', jwtToken)
 
   res.cookie('token', jwtToken, {
     httpOnly: true,

@@ -1,11 +1,12 @@
 import './App.css'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+// import { Toast } from './components/Toast.jsx'
 
 import HomePage from './pages/UserPage/homePage'
 import LoginForm from './pages/AdminPage/loginPage'
 import ItemCRUD from './pages/AdminPage/itemCRUD'
 import DetailForm from './pages/AdminPage/detailPage'
-import MenuPage from './pages/UserPage/menuPage'
+import MenuPage from './pages/UserPage/menuPage.jsx'
 import AdminOrdersPage from './pages/AdminPage/orderPage'
 import ProtectedRoute from './utils/protectedRoute'
 import Dashboard from './components/dashboard'

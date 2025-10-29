@@ -10,7 +10,7 @@ import {
 
 export default function DetailForm() {
   const [restaurant, setRestaurant] = useState({
-    restaurantID: '',
+    restaurantId: '',
     restaurantName: '',
     address: '',
     description: '',
@@ -20,7 +20,7 @@ export default function DetailForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState(null)
 
-  // Load from localStorage on mount
+  // Load from localStorage only
   useEffect(() => {
     const storedData = localStorage.getItem('restaurantDetails')
     if (storedData) {
@@ -31,13 +31,6 @@ export default function DetailForm() {
   const validateField = (name, value) => {
     if ((name === 'restaurantName' || name === 'address') && !value.trim()) {
       return 'This field is required.'
-    }
-    if (
-      name === 'image' &&
-      value &&
-      !/^https?:\/\/.*\.(?:png|jpg|jpeg|gif)$/i.test(value)
-    ) {
-      return 'Please enter a valid image URL (png, jpg, jpeg, gif).'
     }
     return ''
   }
@@ -52,21 +45,30 @@ export default function DetailForm() {
     setRestaurant((prev) => ({ ...prev, [name]: value }))
   }
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setRestaurant((prev) => ({ ...prev, image: reader.result }))
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsSubmitting(true)
     setSubmitError(null)
 
-    const storedData = localStorage.getItem('restaurantDetails')
-    const method = storedData ? 'PATCH' : 'POST'
-
     try {
+      // Validate all fields before submission
       const response = await fetch(
         `${import.meta.env.VITE_BACKEND_URL}/admin/details/${
           restaurant.restaurantId
         }`,
         {
-          method,
+          method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             restaurantName: restaurant.restaurantName,
@@ -77,34 +79,28 @@ export default function DetailForm() {
           credentials: 'include',
         }
       )
-
+      // console.log(`restaurantName: ${restaurant.restaurantName},
+      //       address:${restaurant.address},
+      //       description: ${restaurant.description},
+      //       image: ${restaurant.image}`)
       if (!response.ok) {
-        throw new Error('Failed to save data')
+        throw new Error('Failed to update data')
       }
 
-      const data = await response.json()
-
-      alert(
-        method === 'PATCH'
-          ? 'Restaurant updated successfully!'
-          : 'Restaurant created successfully!'
-      )
+      alert('Restaurant updated successfully!')
     } catch (error) {
       console.error(error)
-      setSubmitError('Error while saving restaurant')
+      setSubmitError('Error while updating restaurant')
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleReset = () => {
-    setRestaurant((prev) => ({
-      ...prev,
-      restaurantName: '',
-      address: '',
-      description: '',
-      image: '',
-    }))
+    const storedData = localStorage.getItem('restaurantDetails')
+    if (storedData) {
+      setRestaurant(JSON.parse(storedData))
+    }
     setErrors({})
     setSubmitError(null)
   }
@@ -116,9 +112,7 @@ export default function DetailForm() {
         <div className="bg-white rounded-xl shadow-lg p-6 animate-fade-in-up">
           <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
             <Store className="h-6 w-6 text-indigo-600" />
-            {localStorage.getItem('restaurantDetails')
-              ? 'Update Restaurant Details'
-              : 'Add Restaurant Details'}
+            Update Restaurant Details
           </h2>
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Restaurant ID (read-only) */}
@@ -128,7 +122,7 @@ export default function DetailForm() {
                 Restaurant ID
               </label>
               <input
-                name="restaurantID"
+                name="restaurantId"
                 type="text"
                 value={restaurant.restaurantId}
                 readOnly
@@ -198,7 +192,7 @@ export default function DetailForm() {
               />
             </div>
 
-            {/* Image URL */}
+            {/* Image Upload */}
             <div>
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
                 <ImageIcon className="h-4 w-4 text-indigo-600" />
@@ -208,16 +202,7 @@ export default function DetailForm() {
                 type="file"
                 name="image"
                 accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files[0]
-                  if (file) {
-                    const reader = new FileReader()
-                    reader.onloadend = () => {
-                      setFormData({ ...formData, image: reader.result }) // store base64
-                    }
-                    reader.readAsDataURL(file)
-                  }
-                }}
+                onChange={handleFileChange}
                 className="w-full p-2 border rounded-lg cursor-pointer file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-indigo-600 file:text-white hover:file:bg-indigo-700"
               />
             </div>
@@ -295,7 +280,7 @@ export default function DetailForm() {
                 Restaurant ID
               </h3>
               <p className="text-lg font-semibold text-gray-800">
-                {restaurant.restaurantID || 'Not provided'}
+                {restaurant.restaurantId || 'Not provided'}
               </p>
             </div>
             <div>
@@ -314,7 +299,7 @@ export default function DetailForm() {
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-600">Description</h3>
-              <p className="text-gray-600">
+              <p className="text-lg font-semibold text-gray-800">
                 {restaurant.description || 'No description provided'}
               </p>
             </div>

@@ -99,8 +99,16 @@ export default function Dashboard() {
 
   const fetchDashboardData = async () => {
     try {
+      const restaurantId = JSON.parse(
+        localStorage.getItem('restaurantDetails')
+      )?.restaurantId
+      // console.log('Restaurant ID:', restaurantId)
+      if (!restaurantId) {
+        console.error('Restaurant ID not found in localStorage')
+        return
+      }
       setLoading(true)
-      const res = await fetch(`${API_URL}/admin/dashboard/earning`, {
+      const res = await fetch(`${API_URL}/admin/dashboard/${restaurantId}`, {
         credentials: 'include',
       })
       const data = await res.json()

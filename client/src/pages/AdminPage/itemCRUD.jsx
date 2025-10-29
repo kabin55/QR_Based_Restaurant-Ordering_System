@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 
 const API_URL = `${import.meta.env.VITE_BACKEND_URL}`
 
@@ -134,36 +134,54 @@ export default function ItemCRUD() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ type: '', item: '', price: '', pic: '' })
-  const [editingId, setEditingId] = useState(null)
+  const [editingItemId, setEditingItemId] = useState(null)
   const [error, setError] = useState(null)
   const [toast, setToast] = useState({ message: '', type: '' })
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
-  const [deleteItem, setDeleteItem] = useState({ id: null, name: '' })
+  const [deleteItemId, setDeleteItemId] = useState(null)
 
+  const formRef = useRef(null)
+
+  const restaurantId = JSON.parse(
+    localStorage.getItem('restaurantDetails')
+  )?.restaurantId
+
+  // Fetch itemList
   const fetchItems = async () => {
+    if (!restaurantId) return
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/items`, { credentials: 'include' })
+      const res = await fetch(`${API_URL}/items/${restaurantId}`, {
+        method: 'GET',
+        credentials: 'include',
+      })
       if (!res.ok) throw new Error('Failed to fetch items')
       const data = await res.json()
-      setItems(data)
+      setItems(data || [])
       setError(null)
     } catch (err) {
       setError(err.message)
       setToast({ message: err.message, type: 'error' })
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
+  useEffect(() => {
+    if (editingItemId && formRef.current) {
+      formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [editingItemId])
 
   useEffect(() => {
     fetchItems()
-  }, [])
+  }, [restaurantId])
 
   const handleChange = (e) => {
     const { name, value } = e.target
     setForm((f) => ({ ...f, [name]: value }))
   }
 
+  // Add or update a single item
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!form.type || !form.item || !form.price) {
@@ -180,15 +198,20 @@ export default function ItemCRUD() {
 
     try {
       let res
-      if (editingId) {
-        res = await fetch(`${API_URL}/admin/items/${editingId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          credentials: 'include',
-        })
+      if (editingItemId) {
+        // Update single item
+        res = await fetch(
+          `${API_URL}/admin/items/${restaurantId}/${editingItemId}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            credentials: 'include',
+          }
+        )
       } else {
-        res = await fetch(`${API_URL}/admin/items`, {
+        // Add item
+        res = await fetch(`${API_URL}/admin/items/${restaurantId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -197,9 +220,9 @@ export default function ItemCRUD() {
       }
       if (!res.ok) throw new Error('Failed to save item')
       setForm({ type: '', item: '', price: '', pic: '' })
-      setEditingId(null)
+      setEditingItemId(null)
       setToast({
-        message: editingId
+        message: editingItemId
           ? 'Item updated successfully'
           : 'Item added successfully',
         type: 'success',
@@ -210,28 +233,6 @@ export default function ItemCRUD() {
     }
   }
 
-  const handleDelete = (id, name) => {
-    setDeleteItem({ id, name })
-    setIsDeleteModalOpen(true)
-  }
-
-  const confirmDelete = async () => {
-    try {
-      const res = await fetch(`${API_URL}/admin/items/${deleteItem.id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      })
-      if (!res.ok) throw new Error('Failed to delete item')
-      setToast({ message: 'Item deleted successfully', type: 'success' })
-      fetchItems()
-    } catch (err) {
-      setToast({ message: err.message, type: 'error' })
-    } finally {
-      setIsDeleteModalOpen(false)
-      setDeleteItem({ id: null, name: '' })
-    }
-  }
-
   const handleEdit = (item) => {
     setForm({
       type: item.type,
@@ -239,21 +240,48 @@ export default function ItemCRUD() {
       price: item.price,
       pic: item.pic || '',
     })
-    setEditingId(item._id)
+    setEditingItemId(item._id)
   }
 
   const handleCancel = () => {
     setForm({ type: '', item: '', price: '', pic: '' })
-    setEditingId(null)
+    setEditingItemId(null)
+  }
+
+  const handleDelete = (itemId) => {
+    setDeleteItemId(itemId)
+    setIsDeleteModalOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteItemId) return
+    try {
+      const res = await fetch(
+        `${API_URL}/admin/items/${restaurantId}/${deleteItemId}`,
+        {
+          method: 'DELETE',
+          credentials: 'include',
+        }
+      )
+      if (!res.ok) throw new Error('Failed to delete item')
+      setToast({ message: 'Item deleted successfully', type: 'success' })
+      fetchItems()
+    } catch (err) {
+      setToast({ message: err.message, type: 'error' })
+    } finally {
+      setIsDeleteModalOpen(false)
+      setDeleteItemId(null)
+    }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div ref={formRef} className="min-h-screen bg-gray-50">
       <Header />
       <div className="max-w-5xl mx-auto p-6">
+        {/* Form Section */}
         <div className="bg-white rounded-xl shadow-md p-8 mb-8">
           <h2 className="text-2xl font-bold mb-6 text-gray-800">
-            {editingId ? 'Edit Item' : 'Add New Item'}
+            {editingItemId ? 'Edit Item' : 'Add New Item'}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -295,9 +323,9 @@ export default function ItemCRUD() {
                 type="submit"
                 className="bg-cyan-600 text-white px-6 py-3 rounded-lg hover:bg-cyan-700 transition duration-200 font-semibold"
               >
-                {editingId ? 'Update Item' : 'Add Item'}
+                {editingItemId ? 'Update Item' : 'Add Item'}
               </button>
-              {editingId && (
+              {editingItemId && (
                 <button
                   type="button"
                   onClick={handleCancel}
@@ -310,13 +338,12 @@ export default function ItemCRUD() {
           </form>
         </div>
 
+        {/* Items List */}
         <h3 className="text-xl font-semibold mb-4 text-gray-800">Items List</h3>
         {loading ? (
           <div className="flex justify-center items-center py-8">
             <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-cyan-600"></div>
           </div>
-        ) : error ? (
-          <p className="text-red-600 bg-red-50 p-4 rounded-lg">{error}</p>
         ) : items.length === 0 ? (
           <p className="text-gray-600 bg-gray-100 p-4 rounded-lg text-center">
             No items found.
@@ -327,13 +354,14 @@ export default function ItemCRUD() {
               <ItemCard
                 key={item._id}
                 item={item}
-                onEdit={handleEdit}
-                onDelete={() => handleDelete(item._id, item.item)}
+                onEdit={() => handleEdit(item)}
+                onDelete={() => handleDelete(item._id)}
               />
             ))}
           </ul>
         )}
       </div>
+
       {toast.message && (
         <Toast
           message={toast.message}
@@ -345,7 +373,7 @@ export default function ItemCRUD() {
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={confirmDelete}
-        itemName={deleteItem.name}
+        itemName={items.find((i) => i._id === deleteItemId)?.item || ''}
       />
     </div>
   )
